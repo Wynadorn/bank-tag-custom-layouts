@@ -4,6 +4,9 @@ plugins {
 
 repositories {
 	mavenLocal()
+    flatDir {
+        dirs 'C:\\Users\\Janos\\Source\\runelite\\wynadorn\\runelite-client\\target'
+    }
 	maven {
 		url = 'https://repo.runelite.net'
 	}
