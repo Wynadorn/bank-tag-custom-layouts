@@ -38,6 +38,7 @@ import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.MenuShouldLeftClick;
 import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
@@ -186,6 +187,8 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 	private Widget showLayoutPreviewButton = null;
 	private Widget applyLayoutPreviewButton = null;
     private Widget cancelLayoutPreviewButton = null;
+
+	private LayoutableThing lastLayoutable = null;
 
 	final AntiDragPluginUtil antiDrag = new AntiDragPluginUtil(this);
 	private final LayoutGenerator layoutGenerator = new LayoutGenerator(this);
@@ -450,7 +453,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		return previewLayout != null;
 	}
 
-	private int lastScrollY = -1;
 	@Subscribe
 	public void onClientTick(ClientTick clientTick) {
 		// This fixes a vanilla bug where it's possible open a placeholder's right-click menu while trying to withdraw an item - see https://github.com/geheur/bank-tag-custom-layouts/issues/33 for more info.
@@ -474,9 +476,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		}
 
 		sawMenuEntryAddedThisClientTick = false;
-
-		Widget container = client.getWidget(WidgetInfo.BANK_ITEM_CONTAINER);
-		if (container != null) lastScrollY = container.getScrollY();
 	}
 
 	private String lastBankTitle = null;
@@ -501,16 +500,45 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		return inventorySetup;
 	}
 
+	@Subscribe(priority = -1f) // "Bank Tags" plugin also sets the scroll bar height; run after it.
+	public void onScriptPreFired(ScriptPreFired event) {
+		if (event.getScriptId() != ScriptID.BANKMAIN_FINISHBUILDING) {
+			return;
+		}
+
+		updateInventorySetupShown();
+
+		LayoutableThing layoutable = getCurrentLayoutableThing();
+		if (layoutable == null) {
+			return;
+		}
+
+		Layout layout = getBankOrder(layoutable);
+		if (layout == null) {
+			return;
+		}
+
+		Optional<Integer> max = layout.getAllUsedIndexes().stream().max(Integer::compare);
+		if (!max.isPresent()) return; // This will result in the minimum height.
+
+		int height = getYForIndex(max.get()) + BANK_ITEM_HEIGHT + 12;
+
+		// This is prior to bankmain_finishbuilding running, so the arguments are still on the stack. Overwrite
+		// argument int12 (7 from the end) which is the height passed to if_setscrollsize
+		client.getIntStack()[client.getIntStackSize() - 7] = height;
+	}
+
 	@Subscribe(priority = -1f) // I want to run after the Bank Tags plugin does, since it will interfere with the layout-ing if hiding tab separators is enabled.
 	public void onScriptPostFired(ScriptPostFired event) {
 		if (event.getScriptId() == ScriptID.BANKMAIN_BUILD) {
-			updateInventorySetupShown();
-
-			if (getCurrentLayoutableThing() == null || getCurrentLayoutableThing() != lastLayoutable) {
+			LayoutableThing layoutable = getCurrentLayoutableThing();
+			if (layoutable == null || layoutable != lastLayoutable) {
 				cancelLayoutPreview();
 			}
 
 			applyCustomBankTagItemPositions();
+
+			lastLayoutable = layoutable;
 
 			updateButton();
 		}
@@ -715,12 +743,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		if (layout == null) {
 			return; // layout not enabled.
 		}
-		if (layout.allPairs().isEmpty() && layoutable.isInventorySetup()) {
-			// Inventory setups by default have an equipment and inventory order, so lay it out automatically if this
-			// is the first time viewing the setup with bank tag layouts.
-			InventorySetup inventorySetup = inventorySetupsAdapter.getInventorySetup(layoutable.name);
-			layout = layoutGenerator.basicInventorySetupsLayout(inventorySetup, Layout.emptyLayout(), getAutoLayoutDuplicateLimit());
-		}
 
 		List<Widget> bankItems = Arrays.stream(client.getWidget(WidgetInfo.BANK_ITEM_CONTAINER).getDynamicChildren())
 				.filter(bankItem -> !bankItem.isHidden() && bankItem.getItemId() >= 0)
@@ -750,7 +772,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		}
 
 		setItemPositions(indexToWidget);
-		setContainerHeight(layoutable, layout);
 		saveLayout(layoutable, layout);
 		log.debug("saved tag " + layoutable);
 	}
@@ -1433,8 +1454,18 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 	private Layout getBankOrderNonPreview(LayoutableThing layoutable) {
 		String configuration = configManager.getConfiguration(CONFIG_GROUP, layoutable.configKey());
 		if (LAYOUT_EXPLICITLY_DISABLED.equals(configuration)) return null;
-		if (configuration == null && (layoutable.isBankTab() && !config.layoutEnabledByDefault() || layoutable.isInventorySetup() && !config.useWithInventorySetups())) return null;
-		if (configuration == null) configuration = "";
+		if (configuration == null) {
+			if (layoutable.isBankTab() && !config.layoutEnabledByDefault() || layoutable.isInventorySetup() && !config.useWithInventorySetups()) {
+				return null;
+			} else if (layoutable.isInventorySetup()) {
+				// Inventory setups by default have an equipment and inventory order, so lay it out automatically if this
+				// is the first time viewing the setup with bank tag layouts.
+				InventorySetup inventorySetup = inventorySetupsAdapter.getInventorySetup(layoutable.name);
+				return layoutGenerator.basicInventorySetupsLayout(inventorySetup, Layout.emptyLayout(), getAutoLayoutDuplicateLimit());
+			}
+
+			configuration = "";
+		}
 		return Layout.fromString(configuration, true);
 	}
 
@@ -1546,29 +1577,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		public boolean isInventorySetup() {
 			return !isBankTab;
 		}
-	}
-
-	private LayoutableThing lastLayoutable = null;
-	private int lastHeight = Integer.MAX_VALUE;
-	private void setContainerHeight(LayoutableThing layoutable, Layout layout) {
-		Widget container = client.getWidget(WidgetInfo.BANK_ITEM_CONTAINER);
-
-		Optional<Integer> max = layout.getAllUsedIndexes().stream().max(Integer::compare);
-		if (!max.isPresent()) return; // This will result in the minimum height.
-
-		int height = getYForIndex(max.get()) + BANK_ITEM_HEIGHT + 12;
-		container.setScrollHeight(height);
-
-		int itemContainerScroll =
-				(!layoutable.equals(lastLayoutable)) ? container.getScrollY() :
-				(height > lastHeight) ? container.getScrollHeight() : lastScrollY;
-		lastHeight = height;
-		lastLayoutable = layoutable;
-		clientThread.invokeLater(() ->
-				client.runScript(ScriptID.UPDATE_SCROLLBAR,
-						WidgetInfo.BANK_SCROLLBAR.getId(),
-						WidgetInfo.BANK_ITEM_CONTAINER.getId(),
-						itemContainerScroll));
 	}
 
 	public String itemName(Integer itemId) {
