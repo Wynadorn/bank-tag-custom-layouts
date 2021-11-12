@@ -116,6 +116,6 @@ public interface BankTagLayoutsConfig extends Config {
 	)
 	default Keybind addKeybind()
 	{
-		return new Keybind(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK);
+		return Keybind.NOT_SET;
 	}
 }
