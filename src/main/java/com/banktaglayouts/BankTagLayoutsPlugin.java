@@ -10,6 +10,8 @@ import com.google.common.collect.ObjectArrays;
 import com.google.common.util.concurrent.Runnables;
 import com.google.gson.Gson;
 import com.google.inject.Provides;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ import net.runelite.api.widgets.WidgetPositionMode;
 import net.runelite.api.widgets.WidgetType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
@@ -252,6 +255,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		spriteManager.addSpriteOverrides(Sprites.values());
 		mouseManager.registerMouseListener(this);
 		keyManager.registerKeyListener(antiDrag);
+		keyManager.registerKeyListener(addItemHotkeyListener);
 
 		clientThread.invokeLater(() -> {
 			if (client.getGameState() == GameState.LOGGED_IN) {
@@ -269,6 +273,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		spriteManager.removeSpriteOverrides(Sprites.values());
 		mouseManager.unregisterMouseListener(this);
 		keyManager.unregisterKeyListener(antiDrag);
+		keyManager.unregisterKeyListener(addItemHotkeyListener);
 
 		clientThread.invokeLater(() -> {
 			if (client.getGameState() == GameState.LOGGED_IN) {
@@ -1666,5 +1671,51 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 				return;
 			}
 		}
+	}
+
+	private final net.runelite.client.input.KeyListener addItemHotkeyListener = new net.runelite.client.input.KeyListener()
+	{
+		@Override
+		public void keyTyped(KeyEvent e)
+		{
+		}
+
+		@Override
+		public void keyPressed(KeyEvent e)
+		{
+			Keybind keybind = config.addKeybind();
+			if (keybind.matches(e))
+			{
+				//if the bank is not open
+				Widget bankContainer = client.getWidget(WidgetInfo.BANK_ITEM_CONTAINER);
+				if (bankContainer == null || bankContainer.isSelfHidden())
+				{
+					//do nothing
+					return;
+				}
+
+				//If the current tab is either a regular tab or an inventory setup
+				if(!tabInterface.isActive() || isInventorySetup())
+				{
+					//do nothing
+					return;
+				}
+
+				//show the add item dialog
+				log.debug("Add layout item hotkey pressed");
+				addToLayout( tabInterface.getActiveTab().getTag());
+				e.consume();
+			}
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e)
+		{
+		}
+	};
+
+	private boolean isInventorySetup()
+	{
+		return config.useWithInventorySetups() && inventorySetup != null;
 	}
 }
