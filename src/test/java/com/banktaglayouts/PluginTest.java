@@ -3,7 +3,7 @@ package com.banktaglayouts;
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class ExamplePluginTest
+public class PluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
