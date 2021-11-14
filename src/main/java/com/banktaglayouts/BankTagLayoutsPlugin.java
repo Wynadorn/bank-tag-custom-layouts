@@ -500,7 +500,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		return inventorySetup;
 	}
 
-	@Subscribe(priority = -1f) // "Bank Tags" plugin also sets the scroll bar height; run after it.
+	@Subscribe(priority = -1f) // "Bank Tags" plugin also sets the scroll bar height; run after it. We also need to run after "Inventory Setups" to get the bank title it sets.
 	public void onScriptPreFired(ScriptPreFired event) {
 		if (event.getScriptId() != ScriptID.BANKMAIN_FINISHBUILDING) {
 			return;
