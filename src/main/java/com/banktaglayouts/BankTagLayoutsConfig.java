@@ -6,10 +6,21 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.Keybind;
+import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("banktaglayouts")
 public interface BankTagLayoutsConfig extends Config {
-    @ConfigItem(
+	@ConfigItem(
+		keyName = "layoutEnabledByDefault",
+		name = "Enable layout by default",
+		description = "When opening a tag tab without layout enabled, automatically enable layout on the tab.",
+		position = 1
+	)
+	default boolean layoutEnabledByDefault() {
+		return false;
+	}
+
+	@ConfigItem(
             keyName = "showLayoutPlaceholders",
             name = "Show Layout Placeholders",
             description = "Show the location of items that are in the layout and in the tag, but not in your bank.",
@@ -20,6 +31,16 @@ public interface BankTagLayoutsConfig extends Config {
         return true;
     }
 
+	@ConfigItem(
+		keyName = "warnForAccidentalBankReorder",
+		name = "Bank reorder warning",
+		description = "Warns you know when you reorder items in your actual bank and not in a layout.",
+		position = 3
+	)
+	default boolean warnForAccidentalBankReorder() {
+		return true;
+	}
+
     @ConfigItem(
             keyName = "tutorialMessage",
             name = "Layout enable tutorial message",
@@ -27,26 +48,6 @@ public interface BankTagLayoutsConfig extends Config {
             position = 4
     )
     default boolean tutorialMessage() {
-        return true;
-    }
-
-    @ConfigItem(
-            keyName = "layoutEnabledByDefault",
-            name = "Enable layout by default",
-            description = "When opening a tag tab without layout enabled, automatically enable layout on the tab.",
-            position = 1
-    )
-    default boolean layoutEnabledByDefault() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "warnForAccidentalBankReorder",
-            name = "Bank reorder warning",
-            description = "Warns you know when you reorder items in your actual bank and not in a layout.",
-            position = 3
-    )
-    default boolean warnForAccidentalBankReorder() {
         return true;
     }
 
@@ -118,4 +119,27 @@ public interface BankTagLayoutsConfig extends Config {
 	{
 		return Keybind.NOT_SET;
 	}
+
+	@ConfigSection(
+		name = "Auto-layout",
+		description = "Auto-layout lays out your tab automatically using items from your equipment and inventory.",
+		position = 100
+	)
+	String autoLayout = "autoLayout";
+
+
+	enum LayoutStyles {
+		ZIGZAG,
+		PRESETS,
+	}
+
+	@ConfigItem(
+		keyName = "autoLayoutStyle",
+		name = "Auto-layout style",
+		description = "The method auto-layout will choose.",
+		position = 1,
+		section = autoLayout
+	)
+	default LayoutStyles autoLayoutStyle() { return LayoutStyles.ZIGZAG; }
+
 }
