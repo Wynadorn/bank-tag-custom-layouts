@@ -1214,19 +1214,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		return index;
 	}
 
-	private void insertMenuEntry(MenuEntry newEntry, MenuEntry[] entries, boolean after)
-	{
-		MenuEntry[] newMenu = ObjectArrays.concat(entries, newEntry);
-
-		if (after)
-		{
-			int menuEntryCount = newMenu.length;
-			ArrayUtils.swap(newMenu, menuEntryCount - 1, menuEntryCount - 2);
-		}
-
-		client.setMenuEntries(newMenu);
-	}
-
 	// TODO do I actually want to remove variant items from the tag? What if I'm just removing one of the layout items, and do not actually want to remove it from the tag? That seems very reasonable.
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
